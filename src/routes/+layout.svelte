@@ -10,10 +10,12 @@
 	import { LightSwitch } from '@skeletonlabs/skeleton';
 </script>
 
-<AppBar gridColumns="grid-cols-3" slotDefault="place-self-center" slotTrail="place-content-end">
-	<svelte:fragment slot="lead">(icon)</svelte:fragment>
-	Bahn Bingo
-	<svelte:fragment slot="trail"><LightSwitch /></svelte:fragment>
-</AppBar>
+<div class="h-screen flex-row">
+	<AppBar gridColumns="grid-cols-3" slotDefault="place-self-center" slotTrail="place-content-end">
+		<svelte:fragment slot="lead">(icon)</svelte:fragment>
+		Bahn Bingo
+		<svelte:fragment slot="trail"><LightSwitch /></svelte:fragment>
+	</AppBar>
 
-<slot />
+	<slot />
+</div>
