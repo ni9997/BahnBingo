@@ -1,5 +1,7 @@
 <script lang="ts">
-	// import Grid from
+
+	import GridEntry from "$lib/GridEntry.svelte";
+	import { Reason } from "$lib/Reason";
 
 	let state: boolean[][] = []
 
@@ -7,16 +9,6 @@
 		state[i] = []
 		for (let j = 0; j < 5; j++) {
 			state[i][j]	= false;
-		}
-	}
-
-	class Reason {
-		id: number;
-		text: string;
-
-		constructor(id: number, text: string) {
-			this.id = id;
-			this.text = text
 		}
 	}
 
@@ -36,7 +28,8 @@
 <div class="m-4 container mx-auto flex grow justify-center">
 	<div class="grid grid-cols-5 grid-rows-5 w-full flex mx-auto  grow justify-center gap-2">
 		{#each reasons as r, index(r.id)}
-			<button class="card p-4 flex grow justify-center" on:click={handleClick}>{r.text}</button>
+			<!-- <button class="card p-4 flex grow justify-center" on:click={handleClick}>{r.text}</button> -->
+			<GridEntry data={r}></GridEntry>
 		{/each}
 	</div>
 </div>
