@@ -1,9 +1,9 @@
 export class Reason {
-    id: number;
     text: string;
+    clicked: boolean;
 
-    constructor(id: number, text: string) {
-        this.id = id;
-        this.text = text
+    constructor(text: string) {
+        this.text = text;
+        this.clicked = false;
     }
 }
