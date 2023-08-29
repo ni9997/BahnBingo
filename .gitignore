@@ -7,4 +7,6 @@ node_modules
 .env.*
 !.env.example
 vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
+vite.config.ts.timestamp-*diese erzeugen, steigt der Preis. Im Falle des Solar API ist etwa denkbar, dass ein Installationsunternehmen das API in seine Webseite einbindet, um Interessenten einen schnellen Überblick zu geben, würde
+
+/.vscode
