@@ -86,10 +86,9 @@
 	}
 </script>
 
-<div class="m-4 container mx-auto flex grow justify-center">
-	<div class="grid grid-cols-5 grid-rows-5 w-full mx-auto grow justify-center gap-2">
+<div class="m-4 flex grow items-center justify-center">
+	<div class="grid grid-cols-5 grid-rows-5 grow gap-2 max-w-6xl">
 		{#each reasons as r, i}
-			<!-- <button class="card p-4 flex grow justify-center" on:click={handleClick}>{r.text}</button> -->
 			<GridEntry
 				text={r.text}
 				clicked={r.clicked}
