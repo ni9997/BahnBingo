@@ -86,8 +86,8 @@
 	}
 </script>
 
-<div class="m-4 flex grow items-center justify-center">
-	<div class="grid grid-cols-5 grid-rows-5 grow gap-2 max-w-6xl">
+<div class="m-4 flex grow items-center justify-center overflow-x-scroll">
+	<div class="grid grid-cols-5 grid-rows-5 grow gap-2 max-w-6xl min-w-[700px]">
 		{#each reasons as r, i}
 			<GridEntry
 				text={r.text}
