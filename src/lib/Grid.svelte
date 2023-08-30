@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { modalStore, type ModalSettings } from '@skeletonlabs/skeleton';
+	import { getModalStore, type ModalSettings } from '@skeletonlabs/skeleton';
 	import GridEntry from './GridEntry.svelte';
 	import type { Reason } from './Reason';
 	import { getReasons } from './ReasonBuilder';
+
+	const modalStore = getModalStore();
 
 	const winModal: ModalSettings = {
 		type: 'alert',
