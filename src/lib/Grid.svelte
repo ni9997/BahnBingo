@@ -82,13 +82,13 @@
 		modalStore.trigger(winModal);
 	}
 
-	function reset() {
+	export function reset() {
 		reasons = getReasons();
 		reasons = reasons.sort(() => 0.5 - Math.random()).slice(0, 25);
 	}
 </script>
 
-<div class="m-4 flex grow items-center justify-center overflow-x-scroll">
+<div class="flex grow items-center justify-center overflow-x-scroll">
 	<div class="grid grid-cols-5 grid-rows-5 grow gap-2 max-w-6xl min-w-[700px]">
 		{#each reasons as r, i}
 			<GridEntry

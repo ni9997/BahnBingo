@@ -27,10 +27,11 @@ export function getReasons() {
 		new Reason('Unfall mit Personenschaden'),
 		new Reason('Streckensperrung'),
 		new Reason('Umleitung'),
-		new Reason('TEST26'),
-		new Reason('TEST27'),
-		new Reason('TEST28'),
-		new Reason('TEST29'),
-		new Reason('TEST30')
+		new Reason('Zug hängt hinter einer S-Bahn fest'),
+		new Reason('Böschungsbrand'),
+		new Reason('Defekt an einem Bahnübergang'),
+		new Reason('Zug hat sich verfahren'),
+		new Reason('Verspätete Bereitstellung des Zuges'),
+		new Reason('Haltestelle verpasst')
 	];
 }
