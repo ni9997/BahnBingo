@@ -6,7 +6,7 @@
 	let control: Control;
 </script>
 
-<div class="m-4 grid gap-4">
+<div class="p-4 grid gap-4">
 	<Grid bind:this={grid} />
 	<Control bind:this={control} {grid} />
 </div>
