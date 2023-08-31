@@ -1,20 +1,30 @@
 <script lang="ts">
+	import Footer from '$lib/components/Footer/Footer.svelte';
+
 	// Most of your app wide CSS should be put in this file
+	import Header from '$lib/components/Header/Header.svelte';
 	import '../app.postcss';
 
-	import { AppBar } from '@skeletonlabs/skeleton';
-	import { LightSwitch } from '@skeletonlabs/skeleton';
+	import { AppShell, Modal } from '@skeletonlabs/skeleton';
 	import { initializeStores } from '@skeletonlabs/skeleton';
 
 	initializeStores();
 </script>
 
-<div class="h-screen flex-row">
-	<AppBar gridColumns="grid-cols-3" slotDefault="place-self-center" slotTrail="place-content-end">
-		<svelte:fragment slot="lead">(icon)</svelte:fragment>
-		Bahn Bingo
-		<svelte:fragment slot="trail"><LightSwitch /></svelte:fragment>
-	</AppBar>
+<svelte:head>
+	<title>Bahnbingo</title>
+</svelte:head>
+
+<Modal />
+
+<AppShell>
+	<svelte:fragment slot="header">
+		<Header />
+	</svelte:fragment>
 
 	<slot />
-</div>
+
+	<svelte:fragment slot="pageFooter">
+		<Footer />
+	</svelte:fragment>
+</AppShell>
