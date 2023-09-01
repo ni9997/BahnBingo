@@ -8,7 +8,7 @@
 	}
 </script>
 
-<div class="flex justify-center items-center gap-4">
+<div class="flex justify-center items-center gap-4 card p-4 variant-outline">
 	<!-- <h3>Game Seed: 1234</h3> -->
 	<button class="btn variant-outline flex-grow" on:click={reset}>Reset</button>
 </div>

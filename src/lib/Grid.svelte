@@ -88,7 +88,7 @@
 	}
 </script>
 
-<div class="flex  max-w-6xl overflow-x-auto">
+<div class="flex max-w-6xl overflow-x-auto">
 	<div class="grid grid-cols-5 grid-rows-5 gap-2 min-w-[50rem]">
 		{#each reasons as r, i}
 			<GridEntry
