@@ -5,8 +5,10 @@
 	let grid: Grid;
 	let control: Control;
 </script>
-
-<div class="p-4 grid gap-4">
-	<Grid bind:this={grid} />
-	<Control bind:this={control} {grid} />
+<div class="flex items-center justify-center">
+    <div class="m-4 grid gap-4 xl:flex">
+        <Grid bind:this={grid} />
+        <Control bind:this={control} {grid} />
+    </div>
 </div>
+
