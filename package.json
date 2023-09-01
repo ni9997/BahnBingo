@@ -37,6 +37,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@tabler/icons-svelte": "^2.32.0"
+		"@tabler/icons-svelte": "2.30.0"
 	}
 }
