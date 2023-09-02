@@ -4,6 +4,6 @@
 
 <AppBar gridColumns="grid-cols-3" slotDefault="place-self-center" slotTrail="place-content-end">
 	<svelte:fragment slot="lead"><img class="max-h-6" src="logo.svg" alt="Logo" /></svelte:fragment>
-	Bahn Bingo
+	Train Games
 	<svelte:fragment slot="trail"><LightSwitch /></svelte:fragment>
 </AppBar>

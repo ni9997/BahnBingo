@@ -11,7 +11,7 @@
 </script>
 
 <svelte:head>
-	<title>Bahnbingo</title>
+	<title>Train Games</title>
 </svelte:head>
 
 <Modal />
