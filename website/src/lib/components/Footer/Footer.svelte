@@ -1,6 +1,6 @@
 <script lang="ts">
-    import IconTrain from '@tabler/icons-svelte/dist/svelte/icons/IconTrain.svelte';
-    import IconHeart from '@tabler/icons-svelte/dist/svelte/icons/IconHeart.svelte'
+	import IconTrain from '@tabler/icons-svelte/dist/svelte/icons/IconTrain.svelte';
+	import IconHeart from '@tabler/icons-svelte/dist/svelte/icons/IconHeart.svelte';
 </script>
 
 <div class="mx-4">

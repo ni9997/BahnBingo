@@ -27,7 +27,8 @@ module.exports = {
 			}
 		}
 	]
-};module.exports = {
+};
+module.exports = {
 	root: true,
 	extends: [
 		'eslint:recommended',
