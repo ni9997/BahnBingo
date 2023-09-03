@@ -5,7 +5,7 @@
 
 	export let standalone = false;
 
-	let current_player = Player.O;
+	export let current_player: Player = Player.O;
 
 	let margin = standalone ? 'm-0' : '';
 
@@ -19,6 +19,9 @@
 	export let finished = false;
 
 	function place(i: number, j: number) {
+		if (state[i][j] != Player.None) {
+			return;
+		}
 		state[i][j] = current_player;
 
 		check_win();
