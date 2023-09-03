@@ -6,12 +6,36 @@
 
 	let current_player: Player = Player.O;
 
+	let socket: WebSocket;
+
 	export function reset() {
 		for (let i = 0; i < 3; i++) {
 			for (let j = 0; j < 3; j++) {
 				boards[i][j].reset();
 			}
 		}
+	}
+
+	export function connect() {
+		console.log("TEST");
+		
+		socket = new WebSocket("ws://localhost:8080")
+
+		socket.addEventListener("open", (event) => {
+			socket.send("Test");
+		});
+
+		socket.addEventListener("message", (event) => {
+			console.log("Received: ", event.data);
+		});
+
+		socket.addEventListener("error", (event) => {
+			console.log(event);
+		})
+	}
+
+	function send() {
+		socket.send("test2")
 	}
 </script>
 
@@ -28,3 +52,5 @@
 		{/each}
 	</div>
 </div>
+<button class="btn variant-filled" on:click={connect}>CLICK</button>
+<button class="btn variant-filled" on:click={send}>CLICK</button>
