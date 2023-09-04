@@ -8,6 +8,18 @@
 
 	let socket: WebSocket;
 
+	enum MessageType {
+		NewSession = "NewSession"
+	}
+
+	class Message {
+		message_type: MessageType;
+
+		constructor() {
+			this.message_type = MessageType.NewSession;
+		}
+	}
+
 	export function reset() {
 		for (let i = 0; i < 3; i++) {
 			for (let j = 0; j < 3; j++) {
@@ -17,26 +29,42 @@
 	}
 
 	export function connect() {
-		console.log("TEST");
-		
-		socket = new WebSocket("ws://localhost:8080")
+		// console.log('TEST');
 
-		socket.addEventListener("open", (event) => {
-			socket.send("Test");
+		socket = new WebSocket('ws://localhost:8080');
+
+		socket.addEventListener('open', (event) => {
+			// socket.send('Test');
+			// socket.send('Test2');
 		});
 
-		socket.addEventListener("message", (event) => {
-			console.log("Received: ", event.data);
+		socket.addEventListener('message', (event) => {
+			console.log('Received: ', event.data);
+			console.log(JSON.parse(event.data));
+			
 		});
 
-		socket.addEventListener("error", (event) => {
+		socket.addEventListener('error', (event) => {
 			console.log(event);
-		})
+		});
+	}
+
+	export function new_game() {
+		socket.send("{\"message_type\":\"NewSession\"}");
+	}
+
+	export function join_game() {
+		socket.send("{\"message_type\":\"JoinSession\"}");
 	}
 
 	function send() {
-		socket.send("test2")
+		console.log('TEST SEND');
+
+		socket.send(test_text);
+		socket.send(JSON.stringify(new Message()))
 	}
+
+	let test_text = "TEST";
 </script>
 
 <div class="m-4 grid gap-4 xl:flex flex-1">
@@ -52,5 +80,6 @@
 		{/each}
 	</div>
 </div>
-<button class="btn variant-filled" on:click={connect}>CLICK</button>
-<button class="btn variant-filled" on:click={send}>CLICK</button>
+<!-- <button class="btn variant-filled" on:click={connect}>Connect</button>
+<button class="btn variant-filled" on:click={send}>Send</button>
+<textarea bind:value={test_text}></textarea> -->
