@@ -6,7 +6,7 @@
 	let control: Control;
 </script>
 
-<div class="flex items-center justify-center h-full w-full bg-yellow-400 min-w-[500px]">
+<div class="flex items-center justify-center h-full w-full bg-yellow-400 min-w-[500px] p-4">
 	<Grid bind:this={grid} />
 	<Control bind:this={control} {grid} />
 </div>
