@@ -14,6 +14,8 @@ use tokio_tungstenite::WebSocketStream;
 use rand::{distributions::Alphanumeric, Rng};
 // use serde_json::Result;
 
+use uuid::Uuid;
+
 #[derive(Serialize, Deserialize, Debug)]
 enum Player {
     O,
@@ -35,7 +37,14 @@ struct Client {
     game: Arc<Mutex<Option<Arc<Mutex<Game>>>>>,
     game_map: Arc<Mutex<HashMap<String, Arc<Mutex<Game>>>>>,
     self_arc: Option<Arc<RwLock<Client>>>,
+    uuid: Uuid,
 }
+
+// impl PartialEq for Client {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.socket_in == other.socket_in && self.socket_out == other.socket_out && self.game == other.game && self.game_map == other.game_map && self.self_arc == other.self_arc
+//     }
+// }
 
 impl Client {
     fn new(
@@ -49,6 +58,7 @@ impl Client {
             game: Arc::new(Mutex::new(None)),
             game_map,
             self_arc: None,
+            uuid: Uuid::new_v4(),
         }
     }
 
@@ -107,6 +117,7 @@ impl Client {
                                                 .get(&String::from(session))
                                                 .cloned();
                                             println!("4");
+                                            self.send(&Message::JoinSuccess(session)).await;
                                         }
                                         Err(()) => {
                                             println!("Join Error")
@@ -128,15 +139,43 @@ impl Client {
                                 match game_lock.clone() {
                                     Some(game) => {
                                         println!("Processing make move {:?}", m);
-                                        let game_lock = game.lock().await;
-                                        println!("Moeve 2");
-                                        game_lock
-                                            .make_move(m, self.self_arc.clone().unwrap())
-                                            .await;
-                                        println!("Moeve 3");
+                                        let mut game_lock = game.lock().await;
+                                        match game_lock
+                                            .make_move(m, &self.uuid)
+                                            .await {
+                                                Ok(p) => {
+                                                    
+                                                    match p{
+                                                        MoveResult::NormalMove => {self.send(&Message::MoveSuccess).await;},
+                                                        MoveResult::WinningMove(p) => {
+                                                            self.send(&Message::MoveSuccess).await;
+                                                            self.send(&Message::GameFinished(p)).await;
+                                                        },
+                                                    }
+                                                }
+                                                Err(())=> {
+                                                    self.send(&Message::InvalidMove).await;
+                                                }
+                                            }
                                     }
                                     None => {
                                         println!("Error make move {:?}", m);
+                                        self.send(&Message::Error).await
+                                    }
+                                }
+                            }
+                            Message::RequestGameStart => {
+                                let game_lock = self.game.lock().await;
+                                match game_lock.clone() {
+                                    Some(game) => {
+                                        let mut game_lock = game.lock().await;
+                                        game_lock
+                                            .begin_game()
+                                            .await.unwrap();
+                                        println!("Starting game {}", game_lock.id);
+                                    }
+                                    None => {
+                                        println!("Error starting game {:?}", m);
                                         self.send(&Message::Error).await
                                     }
                                 }
@@ -150,6 +189,7 @@ impl Client {
                 }
             }
         }
+        // Disconnet from game here?
     }
 
     async fn send(&self, m: &Message<'_>) {
@@ -169,6 +209,9 @@ struct Game {
     id: String,
     player: [Option<Arc<RwLock<Client>>>; 2],
     fields: [[GameField; 3]; 3],
+    next_player: Option<Uuid>,
+    last_move: Option<Move>,
+    running: bool,
 }
 
 impl Game {
@@ -186,6 +229,9 @@ impl Game {
                 [GameField::new(), GameField::new(), GameField::new()],
                 [GameField::new(), GameField::new(), GameField::new()],
             ],
+            next_player: None,
+            running: false,
+            last_move: None,
         }
     }
 
@@ -199,6 +245,24 @@ impl Game {
         Err(())
     }
 
+    async fn begin_game(&mut self) -> Result<(),()> {
+        for p in &self.player {
+            match p {
+                Some(pl) => {
+                    let player_lock = pl.read().await;
+                    player_lock.send(&Message::GameStart).await;
+                },
+                None => {
+                    return Err(());
+                },
+            }
+
+        }
+        self.running = true;
+        
+        Ok(())
+    }
+
     fn get_session_info(&self) -> SessionInfo {
         SessionInfo {
             id: self.id.clone(),
@@ -207,17 +271,40 @@ impl Game {
         }
     }
 
-    async fn make_move(&self, m: Move, client: Arc<RwLock<Client>>) {
-        for i in 0..2 {
-            if let Some(p) = &self.player[i] {
-                println!("Make Move {} 1", i);
-                let player_lock = p.write().await;
-                println!("Make Move {} 2", i);
-                player_lock.send(&Message::MakeMove(m)).await;
-                println!("Make Move {} 3", i);
-            }
+    async fn make_move(&mut self, m: Move, client_uuid: &Uuid) -> Result<MoveResult, ()> {
+        match self.running {
+            true => {
+                for i in 0..2 {
+                    if let Some(p) = &self.player[i] {
+                        let player_lock = p.read().await;
+                        if player_lock.uuid == *client_uuid {
+                            continue;
+                        }
+                        player_lock.send(&Message::MakeMove(m)).await;
+                    }
+                }
+                self.last_move = Some(m);
+                match self.check_winner() {
+                    Some(p) => {
+                        return Ok(MoveResult::WinningMove(p));
+                    },
+                    None => {return Ok(MoveResult::NormalMove);},
+                }
+            },
+            false => {
+                return Err(());
+            },
         }
     }
+
+    fn check_winner(&self) -> Option<Player> {
+        None
+    }
+}
+
+enum MoveResult {
+    NormalMove,
+    WinningMove(Player),
 }
 
 #[derive(Debug)]
@@ -237,19 +324,6 @@ impl GameField {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-enum MessageType {
-    NewSession,
-    JoinSession,
-    SessionInfo,
-    MakeMove,
-    InvalidMove,
-    GameStart,
-    Queue,
-    QueueStatus,
-    #[default]
-    Error,
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct QueueStatus {
@@ -275,10 +349,15 @@ struct Move {
 enum Message<'a> {
     NewSession(()),
     JoinSession(&'a str),
+    JoinSuccess(&'a str),
     SessionInfo(SessionInfo),
     MakeMove(Move),
+    MoveSuccess,
     InvalidMove,
     GameStart,
+    GameFinished(Player),
+    RequestGameStart,
+    NotifyPlayerJoined,
     Queue,
     QueueStatus(QueueStatus),
     Error,
@@ -295,6 +374,7 @@ async fn handle_connection(
     // let (mut outgoing, mut incoming) = ws_stream.split();
     let c = Client::new(ws_stream, game_map);
     let c_arc = Arc::new(RwLock::new(c));
+    
     {
         let mut c_arc_guard = c_arc.write().await;
         c_arc_guard.set_self_arc(c_arc.clone());
@@ -309,12 +389,7 @@ async fn handle_connection(
 async fn main() -> Result<(), Error> {
     println!("Hello, world!");
 
-    let test = Message::MakeMove(Move {
-        global_grid_x: 0,
-        global_grid_y: 1,
-        local_grid_x: 2,
-        local_grid_y: 3,
-    });
+    let test = Message::RequestGameStart;
     println!("{}", serde_json::to_string(&test).unwrap());
 
     let addr = "127.0.0.1:8080";
