@@ -105,7 +105,7 @@ impl Client {
                                     let mut games_guard = self.game_map.lock().await;
                                     let new_game = Arc::new(Mutex::new(Game::new()));
                                     let session_info = {
-                                        let mut game_lock = new_game.lock().await;
+                                        let game_lock = new_game.lock().await;
                                         game_lock.get_session_info()
                                     };
                                     session_id = Some(session_info.id.clone());
@@ -316,31 +316,48 @@ impl Game {
     }
 
     async fn make_move(&mut self, m: Move, client_uuid: &Uuid) -> Result<MoveResult, ()> {
-        match self.running {
-            true => {
+        match self.check_valid_move(&m) {
+            Ok(()) => match self.running {
+                true => {
+                    for i in 0..2 {
+                        if let Some(p) = &self.player[i] {
+                            let player_lock = p.read().await;
+                            if player_lock.uuid == *client_uuid {
+                                continue;
+                            }
+                            player_lock.send(&Message::MakeMove(m)).await;
+                        }
+                    }
+                    self.last_move = Some(m);
+                    match self.check_winner() {
+                        Some(p) => {
+                            return Ok(MoveResult::WinningMove(p));
+                        }
+                        None => {
+                            return Ok(MoveResult::NormalMove);
+                        }
+                    }
+                }
+                false => {
+                    return Err(());
+                }
+            },
+            Err(()) => {
                 for i in 0..2 {
                     if let Some(p) = &self.player[i] {
                         let player_lock = p.read().await;
                         if player_lock.uuid == *client_uuid {
-                            continue;
+                            player_lock.send(&Message::InvalidMove).await;
                         }
-                        player_lock.send(&Message::MakeMove(m)).await;
                     }
                 }
-                self.last_move = Some(m);
-                match self.check_winner() {
-                    Some(p) => {
-                        return Ok(MoveResult::WinningMove(p));
-                    }
-                    None => {
-                        return Ok(MoveResult::NormalMove);
-                    }
-                }
-            }
-            false => {
                 return Err(());
             }
         }
+    }
+
+    fn check_valid_move(&self, m: &Move) -> Result<(), ()> {
+        Ok(())
     }
 
     fn check_winner(&self) -> Option<Player> {
