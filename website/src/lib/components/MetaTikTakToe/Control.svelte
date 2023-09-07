@@ -3,6 +3,10 @@
 
 	export let grid: Grid;
 
+	// grid.set_control(this);
+
+	let session_id: string;
+
 	function reset() {
 		grid.reset();
 	}
@@ -16,7 +20,7 @@
 	}
 
 	function join_game() {
-		grid.join_game();
+		grid.join_game(session_id);
 	}
 </script>
 
@@ -25,7 +29,13 @@
 	<hr class="" />
 	<button class="btn variant-filled-success flex flex-1 w-full" on:click={reset}>Reset</button>
 	<button class="btn variant-filled-success flex flex-1 w-full" on:click={connect}>Connect</button>
-	<button class="btn variant-filled-success flex flex-1 w-full" on:click={new_game}>New Game</button>
-	<button class="btn variant-filled-success flex flex-1 w-full" on:click={join_game}>Join Game</button>
+	<button class="btn variant-filled-success flex flex-1 w-full" on:click={new_game}>New Game</button
+	>
+	<div>
+		<input type="text" class="input" bind:value={session_id} />
+	<button class="btn variant-filled-success flex flex-1 w-full" on:click={join_game}
+		>Join Game</button
+	>
+</div>
 	<button class="btn variant-filled-success flex flex-1 w-full" on:click={reset}>Reset</button>
 </div>

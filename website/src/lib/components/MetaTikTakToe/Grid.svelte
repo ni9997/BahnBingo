@@ -1,15 +1,22 @@
 <script lang="ts">
+	import type Control from './Control.svelte';
 	import TicTacToe from '../TicTacToe/TicTacToe.svelte';
 	import { Player } from '../TicTacToe/utils';
 
 	let boards: TicTacToe[][] = [Array(3), Array(3), Array(3)];
+
+	// export let control: Control
+
+	// export function set_control(c: Control) {
+	// 	control = c;
+	// }
 
 	let current_player: Player = Player.O;
 
 	let socket: WebSocket;
 
 	enum MessageType {
-		NewSession = "NewSession"
+		NewSession = 'NewSession'
 	}
 
 	class Message {
@@ -41,7 +48,6 @@
 		socket.addEventListener('message', (event) => {
 			console.log('Received: ', event.data);
 			console.log(JSON.parse(event.data));
-			
 		});
 
 		socket.addEventListener('error', (event) => {
@@ -50,21 +56,21 @@
 	}
 
 	export function new_game() {
-		socket.send("{\"message_type\":\"NewSession\"}");
+		socket.send('{"NewSession":null}');
 	}
 
-	export function join_game() {
-		socket.send("{\"message_type\":\"JoinSession\"}");
+	export function join_game(session_id: string) {
+		socket.send(`{"JoinSession":"${session_id}"}`);
 	}
 
 	function send() {
 		console.log('TEST SEND');
 
 		socket.send(test_text);
-		socket.send(JSON.stringify(new Message()))
+		socket.send(JSON.stringify(new Message()));
 	}
 
-	let test_text = "TEST";
+	let test_text = 'TEST';
 </script>
 
 <div class="m-4 grid gap-4 xl:flex flex-1">
@@ -73,7 +79,7 @@
 			<div class="flex flex-col flex-1">
 				{#each [0, 1, 2] as j}
 					<div class="card m-1 aspect-square border-solid border border-red-600 rounded-none flex">
-						<TicTacToe standalone={false} bind:current_player bind:this={boards[i][j]} />
+						<TicTacToe standalone={false} bind:current_player bind:this={boards[i][j]} {socket} global_x={i} global_y={j} />
 					</div>
 				{/each}
 			</div>
