@@ -2,8 +2,11 @@
 	import type Control from './Control.svelte';
 	import TicTacToe from '../TicTacToe/TicTacToe.svelte';
 	import { Player } from '../TicTacToe/utils';
+	import { getToastStore } from '@skeletonlabs/skeleton';
 
 	let boards: TicTacToe[][] = [Array(3), Array(3), Array(3)];
+
+	const toastStore = getToastStore();
 
 	// export let control: Control
 
@@ -12,6 +15,7 @@
 	// }
 
 	let current_player: Player = Player.O;
+	let this_player: Player;
 
 	let socket: WebSocket;
 
@@ -47,7 +51,27 @@
 
 		socket.addEventListener('message', (event) => {
 			console.log('Received: ', event.data);
-			console.log(JSON.parse(event.data));
+			let data = JSON.parse(event.data);
+			console.log(data);
+			if(data["MakeMove"]) {
+				let move = data["MakeMove"]
+				// console.log(data["MakeMove"]);
+				boards[move["global_grid_x"]][move["global_grid_y"]].remote_place(move["local_grid_x"], move["local_grid_y"])
+			} else if (data["JoinSuccess"]) {
+				toastStore.trigger({message: `Joined session ${data["JoinSuccess"]}`});
+			} else if (data["GameStart"]) {
+				if (data["GameStart"]["starting_player"] == "O") {
+					current_player = Player.O;
+				} else {
+					current_player = Player.X;
+				}
+				if (data["GameStart"]["player"] == "O") {
+					this_player = Player.O;
+				} else {
+					this_player = Player.X;
+				}
+				toastStore.trigger({message: "Game starting now!"})
+			}
 		});
 
 		socket.addEventListener('error', (event) => {
@@ -63,11 +87,8 @@
 		socket.send(`{"JoinSession":"${session_id}"}`);
 	}
 
-	function send() {
-		console.log('TEST SEND');
-
-		socket.send(test_text);
-		socket.send(JSON.stringify(new Message()));
+	export function start_game() {
+		socket.send('"RequestGameStart"')
 	}
 
 	let test_text = 'TEST';
@@ -79,7 +100,7 @@
 			<div class="flex flex-col flex-1">
 				{#each [0, 1, 2] as j}
 					<div class="card m-1 aspect-square border-solid border border-red-600 rounded-none flex">
-						<TicTacToe standalone={false} bind:current_player bind:this={boards[i][j]} {socket} global_x={i} global_y={j} />
+						<TicTacToe standalone={false} bind:current_player bind:this_player bind:this={boards[i][j]} {socket} global_x={i} global_y={j} />
 					</div>
 				{/each}
 			</div>

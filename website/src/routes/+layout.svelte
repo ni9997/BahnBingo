@@ -5,7 +5,7 @@
 
 	import '../app.postcss';
 
-	import { AppShell, Modal } from '@skeletonlabs/skeleton';
+	import { AppShell, Modal, Toast } from '@skeletonlabs/skeleton';
 	import { initializeStores, Drawer, getDrawerStore } from '@skeletonlabs/skeleton';
 
 	initializeStores();
@@ -25,6 +25,8 @@
 </svelte:head>
 
 <Modal />
+
+<Toast />
 
 <Drawer>
 	<h2 class="p-4">Navigation</h2>

@@ -16,7 +16,7 @@ use rand::{distributions::Alphanumeric, Rng};
 
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 enum Player {
     O,
     X,
@@ -38,6 +38,7 @@ struct Client {
     game_map: Arc<Mutex<HashMap<String, Arc<Mutex<Game>>>>>,
     self_arc: Option<Arc<RwLock<Client>>>,
     uuid: Uuid,
+    player: Arc<Mutex<Option<Player>>>,
 }
 
 // impl PartialEq for Client {
@@ -59,6 +60,7 @@ impl Client {
             game_map,
             self_arc: None,
             uuid: Uuid::new_v4(),
+            player: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -66,11 +68,30 @@ impl Client {
         self.self_arc = Some(self_arc);
     }
 
+    async fn self_disconnet(&self) {
+        let mut game_lock = self.game.lock().await;
+        if game_lock.is_some() {
+            game_lock
+                .as_mut()
+                .unwrap()
+                .lock()
+                .await
+                .disconnect_player(self.uuid)
+                .await;
+            let mut game_map_lock = self.game_map.lock().await;
+            game_map_lock.remove(&game_lock.as_mut().unwrap().lock().await.id);
+        }
+    }
+
     async fn process_massages(&self) {
         let mut incoming_guard = self.socket_in.lock().await;
         while let Some(x) = incoming_guard.next().await {
             if let Ok(data) = x {
-                println!("{:?}", data);
+                if data.is_close() {
+                    self.self_disconnet().await;
+                    return;
+                }
+                println!("Processing Message: {:?}", data);
                 let m_r: serde_json::Result<Message> =
                     serde_json::from_str(data.to_text().unwrap());
                 match m_r {
@@ -78,55 +99,38 @@ impl Client {
                         println!("{:?}", m);
                         match m {
                             Message::NewSession(()) => {
-                                println!("New session");
-                                let mut games_guard = self.game_map.lock().await;
-                                let new_game = Arc::new(Mutex::new(Game::new()));
-                                let session_info = {
-                                    let game_lock = new_game.lock().await;
-                                    game_lock.get_session_info()
-                                };
-                                games_guard.insert(session_info.id.clone(), new_game);
-                                self.socket_out
-                                    .lock()
-                                    .await
-                                    .send(tokio_tungstenite::tungstenite::Message::Text(
-                                        serde_json::to_string(&Message::SessionInfo(session_info))
-                                            .unwrap()
-                                    ))
-                                    .await
-                                    .unwrap();
-                                println!("New session created")
-                            }
-                            Message::JoinSession(session) => {
-                                // let games_guard = self.games.lock().await;
-                                // println!("{:?}", games_guard);
-                                println!("Joining session: {}", session);
-                                let mut game_map_guard = self.game_map.lock().await;
-                                println!("1");
-                                if let Some(game) = game_map_guard.get(&String::from(session)) {
-                                    match game
+                                let mut session_id = None;
+                                {
+                                    println!("New session");
+                                    let mut games_guard = self.game_map.lock().await;
+                                    let new_game = Arc::new(Mutex::new(Game::new()));
+                                    let session_info = {
+                                        let mut game_lock = new_game.lock().await;
+                                        game_lock.get_session_info()
+                                    };
+                                    session_id = Some(session_info.id.clone());
+                                    games_guard.insert(session_info.id.clone(), new_game);
+                                    self.socket_out
                                         .lock()
                                         .await
-                                        .join(self.self_arc.as_ref().unwrap().clone())
-                                    {
-                                        Ok(()) => {
-                                            println!("2");
-                                            let mut self_game_lock = self.game.lock().await;
-                                            println!("3");
-                                            *self_game_lock = game_map_guard
-                                                .get(&String::from(session))
-                                                .cloned();
-                                            println!("4");
-                                            self.send(&Message::JoinSuccess(session)).await;
-                                        }
-                                        Err(()) => {
-                                            println!("Join Error")
-                                        }
-                                    }
-                                } else {
-                                    println!("No game found for session id: {}", session);
+                                        .send(tokio_tungstenite::tungstenite::Message::Text(
+                                            serde_json::to_string(&Message::SessionInfo(
+                                                session_info,
+                                            ))
+                                            .unwrap(),
+                                        ))
+                                        .await
+                                        .unwrap();
+                                    println!("New session created");
                                 }
-                                println!("Session join finished");
+                                {
+                                    if let Some(session) = session_id {
+                                        self.join_game(&session).await;
+                                    }
+                                }
+                            }
+                            Message::JoinSession(session) => {
+                                self.join_game(session).await;
                             }
                             Message::MakeMove(m) => {
                                 println!("Move received");
@@ -140,23 +144,20 @@ impl Client {
                                     Some(game) => {
                                         println!("Processing make move {:?}", m);
                                         let mut game_lock = game.lock().await;
-                                        match game_lock
-                                            .make_move(m, &self.uuid)
-                                            .await {
-                                                Ok(p) => {
-                                                    
-                                                    match p{
-                                                        MoveResult::NormalMove => {self.send(&Message::MoveSuccess).await;},
-                                                        MoveResult::WinningMove(p) => {
-                                                            self.send(&Message::MoveSuccess).await;
-                                                            self.send(&Message::GameFinished(p)).await;
-                                                        },
-                                                    }
+                                        match game_lock.make_move(m, &self.uuid).await {
+                                            Ok(p) => match p {
+                                                MoveResult::NormalMove => {
+                                                    self.send(&Message::MoveSuccess).await;
                                                 }
-                                                Err(())=> {
-                                                    self.send(&Message::InvalidMove).await;
+                                                MoveResult::WinningMove(p) => {
+                                                    self.send(&Message::MoveSuccess).await;
+                                                    self.send(&Message::GameFinished(p)).await;
                                                 }
+                                            },
+                                            Err(()) => {
+                                                self.send(&Message::InvalidMove).await;
                                             }
+                                        }
                                     }
                                     None => {
                                         println!("Error make move {:?}", m);
@@ -169,9 +170,7 @@ impl Client {
                                 match game_lock.clone() {
                                     Some(game) => {
                                         let mut game_lock = game.lock().await;
-                                        game_lock
-                                            .begin_game()
-                                            .await.unwrap();
+                                        game_lock.begin_game().await.unwrap();
                                         println!("Starting game {}", game_lock.id);
                                     }
                                     None => {
@@ -202,6 +201,49 @@ impl Client {
             .await
             .unwrap();
     }
+
+    async fn join_game(&self, session: &str) {
+        println!("Joining session: {}", session);
+        let game_map_guard = self.game_map.lock().await;
+        if let Some(game) = game_map_guard.get(&String::from(session)) {
+            match game
+                .lock()
+                .await
+                .join(self.self_arc.as_ref().unwrap().clone())
+            {
+                Ok(()) => {
+                    let mut self_game_lock = self.game.lock().await;
+                    *self_game_lock = game_map_guard.get(&String::from(session)).cloned();
+                    self.send(&Message::JoinSuccess(session)).await;
+                }
+                Err(()) => {
+                    println!("Join Error")
+                }
+            }
+        } else {
+            println!("No game found for session id: {}", session);
+        }
+        println!("Session join finished");
+    }
+
+    async fn set_player(&self, player: Player) {
+        let mut player_lock = self.player.lock().await;
+        *player_lock = Some(player);
+    }
+
+    async fn send_game_start(&self) {
+        self.send(&Message::GameStart(GameStartInfo {
+            starting_player: Player::O,
+            player: self.player.lock().await.unwrap(),
+        }))
+        .await;
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct GameStartInfo {
+    starting_player: Player,
+    player: Player,
 }
 
 #[derive(Debug)]
@@ -245,21 +287,23 @@ impl Game {
         Err(())
     }
 
-    async fn begin_game(&mut self) -> Result<(),()> {
-        for p in &self.player {
+    async fn begin_game(&mut self) -> Result<(), ()> {
+        let temp: [Player; 2] = [Player::O, Player::X];
+        for i in 0..self.player.len() {
+            let p = &self.player[i];
             match p {
                 Some(pl) => {
                     let player_lock = pl.read().await;
-                    player_lock.send(&Message::GameStart).await;
-                },
+                    player_lock.set_player(temp[i]).await;
+                    player_lock.send_game_start().await;
+                }
                 None => {
                     return Err(());
-                },
+                }
             }
-
         }
         self.running = true;
-        
+
         Ok(())
     }
 
@@ -287,18 +331,30 @@ impl Game {
                 match self.check_winner() {
                     Some(p) => {
                         return Ok(MoveResult::WinningMove(p));
-                    },
-                    None => {return Ok(MoveResult::NormalMove);},
+                    }
+                    None => {
+                        return Ok(MoveResult::NormalMove);
+                    }
                 }
-            },
+            }
             false => {
                 return Err(());
-            },
+            }
         }
     }
 
     fn check_winner(&self) -> Option<Player> {
         None
+    }
+
+    async fn disconnect_player(&mut self, uuid: Uuid) {
+        for i in 0..2 {
+            if let Some(p) = self.player[i].clone() {
+                if p.read().await.uuid == uuid {
+                    self.player[i] = None;
+                }
+            }
+        }
     }
 }
 
@@ -323,7 +379,6 @@ impl GameField {
         }
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 struct QueueStatus {
@@ -354,7 +409,7 @@ enum Message<'a> {
     MakeMove(Move),
     MoveSuccess,
     InvalidMove,
-    GameStart,
+    GameStart(GameStartInfo),
     GameFinished(Player),
     RequestGameStart,
     NotifyPlayerJoined,
@@ -374,7 +429,7 @@ async fn handle_connection(
     // let (mut outgoing, mut incoming) = ws_stream.split();
     let c = Client::new(ws_stream, game_map);
     let c_arc = Arc::new(RwLock::new(c));
-    
+
     {
         let mut c_arc_guard = c_arc.write().await;
         c_arc_guard.set_self_arc(c_arc.clone());
@@ -389,7 +444,10 @@ async fn handle_connection(
 async fn main() -> Result<(), Error> {
     println!("Hello, world!");
 
-    let test = Message::RequestGameStart;
+    let test = Message::GameStart(GameStartInfo {
+        starting_player: Player::O,
+        player: Player::X,
+    });
     println!("{}", serde_json::to_string(&test).unwrap());
 
     let addr = "127.0.0.1:8080";

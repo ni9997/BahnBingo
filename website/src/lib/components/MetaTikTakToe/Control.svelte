@@ -22,6 +22,10 @@
 	function join_game() {
 		grid.join_game(session_id);
 	}
+
+	function start_game() {
+		grid.start_game();
+	}
 </script>
 
 <div class="card min-w-[20%] p-4 flex flex-col gap-4">
@@ -37,5 +41,5 @@
 		>Join Game</button
 	>
 </div>
-	<button class="btn variant-filled-success flex flex-1 w-full" on:click={reset}>Reset</button>
+	<button class="btn variant-filled-success flex flex-1 w-full" on:click={start_game}>Start Game</button>
 </div>

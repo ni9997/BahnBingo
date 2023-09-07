@@ -9,6 +9,7 @@
 	export let socket: WebSocket;
 
 	export let current_player: Player = Player.O;
+	export let this_player: Player;
 
 	let margin = standalone ? 'm-0' : '';
 
@@ -21,7 +22,20 @@
 	export var winner = Player.None;
 	export let finished = false;
 
-	function place(i: number, j: number) {
+	export function remote_place(i: number, j: number) {
+		state[i][j] = current_player;
+		check_win();
+		if (current_player == Player.O) {
+			current_player = Player.X;
+		} else if (current_player == Player.X) {
+			current_player = Player.O;
+		}
+	}
+
+	export function place(i: number, j: number) {
+		if (this_player != current_player) {
+			return;
+		}
 		if (state[i][j] != Player.None) {
 			return;
 		}
