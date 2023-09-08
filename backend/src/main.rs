@@ -8,7 +8,7 @@ use futures_util::{
 };
 use tokio::net::{TcpListener, TcpStream};
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use tokio_tungstenite::WebSocketStream;
 
 use rand::{distributions::Alphanumeric, Rng};
@@ -49,10 +49,10 @@ struct Client {
 
 impl Client {
     fn new(
-        mut socket: WebSocketStream<TcpStream>,
+        socket: WebSocketStream<TcpStream>,
         game_map: Arc<Mutex<HashMap<String, Arc<Mutex<Game>>>>>,
     ) -> Client {
-        let (mut outgoing, mut incoming) = socket.split();
+        let (outgoing, incoming) = socket.split();
         Client {
             socket_in: Arc::new(Mutex::new(incoming)),
             socket_out: Arc::new(Mutex::new(outgoing)),
@@ -69,18 +69,7 @@ impl Client {
     }
 
     async fn self_disconnet(&self) {
-        let mut game_lock = self.game.lock().await;
-        if game_lock.is_some() {
-            game_lock
-                .as_mut()
-                .unwrap()
-                .lock()
-                .await
-                .disconnect_player(self.uuid)
-                .await;
-            let mut game_map_lock = self.game_map.lock().await;
-            game_map_lock.remove(&game_lock.as_mut().unwrap().lock().await.id);
-        }
+        self.leave_current_session().await;
     }
 
     async fn process_massages(&self) {
@@ -99,37 +88,12 @@ impl Client {
                         println!("{:?}", m);
                         match m {
                             Message::NewSession(()) => {
-                                let mut session_id = None;
-                                {
-                                    println!("New session");
-                                    let mut games_guard = self.game_map.lock().await;
-                                    let new_game = Arc::new(Mutex::new(Game::new()));
-                                    let session_info = {
-                                        let game_lock = new_game.lock().await;
-                                        game_lock.get_session_info()
-                                    };
-                                    session_id = Some(session_info.id.clone());
-                                    games_guard.insert(session_info.id.clone(), new_game);
-                                    self.socket_out
-                                        .lock()
-                                        .await
-                                        .send(tokio_tungstenite::tungstenite::Message::Text(
-                                            serde_json::to_string(&Message::SessionInfo(
-                                                session_info,
-                                            ))
-                                            .unwrap(),
-                                        ))
-                                        .await
-                                        .unwrap();
-                                    println!("New session created");
-                                }
-                                {
-                                    if let Some(session) = session_id {
-                                        self.join_game(&session).await;
-                                    }
-                                }
+                                self.leave_current_session().await;
+                                let session_id = self.create_session().await;
+                                self.join_game(session_id.as_str()).await;
                             }
                             Message::JoinSession(session) => {
+                                self.leave_current_session().await;
                                 self.join_game(session).await;
                             }
                             Message::MakeMove(m) => {
@@ -200,6 +164,56 @@ impl Client {
             ))
             .await
             .unwrap();
+    }
+
+    async fn leave_current_session(&self) {
+        println!("Leaving current session");
+        let game_lock = self.game.lock().await;
+        println!("1");
+        if game_lock.is_some() {
+            println!("2");
+            let mut game = game_lock.as_ref().unwrap().lock().await;
+            println!("3");
+            match game.disconnect_player(self.uuid).await {
+                Ok(DisconnectResult::NoRemainingPlayer) => {
+                    println!("4");
+                    let mut game_map_lock = self.game_map.lock().await;
+                    println!("5");
+                    game_map_lock.remove(&game.id);
+                    println!("6");
+                }
+                _ => {}
+            }
+        }
+        println!("Leaving finished");
+    }
+
+    async fn create_session(&self) -> String {
+        let session_id;
+        {
+            println!("New session");
+            let mut games_guard = self.game_map.lock().await;
+            let new_game = Arc::new(Mutex::new(Game::new()));
+            let mut self_game_lock = self.game.lock().await;
+            *self_game_lock = Some(new_game.clone());
+            let session_info = {
+                let game_lock = new_game.lock().await;
+                game_lock.get_session_info()
+            };
+            session_id = Some(session_info.id.clone());
+            games_guard.insert(session_info.id.clone(), new_game);
+            self.socket_out
+                .lock()
+                .await
+                .send(tokio_tungstenite::tungstenite::Message::Text(
+                    serde_json::to_string(&Message::SessionInfo(session_info)).unwrap(),
+                ))
+                .await
+                .unwrap();
+            println!("New session created");
+            // println!("Game set to creating session {:?}", self.game.lock().await);
+        }
+        session_id.unwrap()
     }
 
     async fn join_game(&self, session: &str) {
@@ -289,8 +303,8 @@ impl Game {
 
     async fn begin_game(&mut self) -> Result<(), ()> {
         let temp: [Player; 2] = [Player::O, Player::X];
-        for i in 0..self.player.len() {
-            let p = &self.player[i];
+        for (i, p) in self.player.iter().enumerate() {
+            // let p = &self.player[i];
             match p {
                 Some(pl) => {
                     let player_lock = pl.read().await;
@@ -319,6 +333,9 @@ impl Game {
         match self.check_valid_move(&m) {
             Ok(()) => match self.running {
                 true => {
+                    self.fields[m.global_grid_x][m.global_grid_y].fields[m.local_grid_x]
+                        [m.local_grid_y] = self.get_player_by_uuid(*client_uuid).await;
+                    println!("{:?}", self.fields);
                     for i in 0..2 {
                         if let Some(p) = &self.player[i] {
                             let player_lock = p.read().await;
@@ -330,17 +347,11 @@ impl Game {
                     }
                     self.last_move = Some(m);
                     match self.check_winner() {
-                        Some(p) => {
-                            return Ok(MoveResult::WinningMove(p));
-                        }
-                        None => {
-                            return Ok(MoveResult::NormalMove);
-                        }
+                        Some(p) => Ok(MoveResult::WinningMove(p)),
+                        None => Ok(MoveResult::NormalMove),
                     }
                 }
-                false => {
-                    return Err(());
-                }
+                false => Err(()),
             },
             Err(()) => {
                 for i in 0..2 {
@@ -351,12 +362,12 @@ impl Game {
                         }
                     }
                 }
-                return Err(());
+                Err(())
             }
         }
     }
 
-    fn check_valid_move(&self, m: &Move) -> Result<(), ()> {
+    fn check_valid_move(&self, _m: &Move) -> Result<(), ()> {
         Ok(())
     }
 
@@ -364,7 +375,7 @@ impl Game {
         None
     }
 
-    async fn disconnect_player(&mut self, uuid: Uuid) {
+    async fn disconnect_player(&mut self, uuid: Uuid) -> Result<DisconnectResult, ()> {
         for i in 0..2 {
             if let Some(p) = self.player[i].clone() {
                 if p.read().await.uuid == uuid {
@@ -372,7 +383,31 @@ impl Game {
                 }
             }
         }
+        let remaining_player = self.player.iter().filter(|x| x.is_some()).count();
+        if remaining_player == 0 {
+            return Ok(DisconnectResult::NoRemainingPlayer);
+        } else {
+            return Ok(DisconnectResult::OneRemainingPlayer);
+        }
     }
+
+    async fn get_player_by_uuid(&self, uuid: Uuid) -> Player {
+        for p in &self.player {
+            if let Some(player) = p {
+                let player_lock = player.read().await;
+                if player_lock.uuid == uuid {
+                    let p_lock = player_lock.player.lock().await;
+                    return (*p_lock).unwrap();
+                }
+            }
+        }
+        Player::None
+    }
+}
+
+enum DisconnectResult {
+    NoRemainingPlayer,
+    OneRemainingPlayer,
 }
 
 enum MoveResult {
@@ -411,10 +446,10 @@ struct SessionInfo {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 struct Move {
-    global_grid_x: u8,
-    global_grid_y: u8,
-    local_grid_x: u8,
-    local_grid_y: u8,
+    global_grid_x: usize,
+    global_grid_y: usize,
+    local_grid_x: usize,
+    local_grid_y: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -457,6 +492,27 @@ async fn handle_connection(
     // c_arc_guard.lock().process_massages().await;
 }
 
+async fn handle_user_input(game_map: Arc<Mutex<HashMap<String, Arc<Mutex<Game>>>>>) {
+    let mut running = true;
+    while running {
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        // println!("{:?}", input.trim());
+        match input.trim() {
+            "list" => {
+                let games_lock = game_map.lock().await;
+                println!("Currently running {} games", games_lock.len());
+            }
+            "exit" => {
+                running = false;
+            }
+            _ => {
+                println!("Unknown command");
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     println!("Hello, world!");
@@ -475,6 +531,8 @@ async fn main() -> Result<(), Error> {
 
     let game_map: Arc<Mutex<HashMap<String, Arc<Mutex<Game>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+
+    tokio::spawn(handle_user_input(game_map.clone()));
 
     while let Ok((stream, _)) = listener.accept().await {
         let game_map_ref = game_map.clone();
