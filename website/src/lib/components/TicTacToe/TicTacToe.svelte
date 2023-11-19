@@ -41,8 +41,10 @@
 		}
 		state[i][j] = current_player;
 
-		if(!standalone) {
-			socket.send(`{"MakeMove":{"global_grid_x":${global_x},"global_grid_y":${global_y},"local_grid_x":${i},"local_grid_y":${j}}}`);
+		if (!standalone) {
+			socket.send(
+				`{"MakeMove":{"global_grid_x":${global_x},"global_grid_y":${global_y},"local_grid_x":${i},"local_grid_y":${j}}}`
+			);
 		}
 
 		check_win();

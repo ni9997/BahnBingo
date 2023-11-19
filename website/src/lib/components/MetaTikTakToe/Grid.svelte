@@ -8,7 +8,7 @@
 
 	const toastStore = getToastStore();
 
-	// export let control: Control
+	export let control: Control;
 
 	// export function set_control(c: Control) {
 	// 	control = c;
@@ -17,7 +17,7 @@
 	let current_player: Player = Player.O;
 	let this_player: Player;
 
-	let socket: WebSocket;
+	export let socket: WebSocket;
 
 	enum MessageType {
 		NewSession = 'NewSession'
@@ -39,45 +39,33 @@
 		}
 	}
 
-	export function connect() {
-		// console.log('TEST');
-
-		socket = new WebSocket('ws://localhost:8080');
-
-		socket.addEventListener('open', (event) => {
-			// socket.send('Test');
-			// socket.send('Test2');
-		});
-
-		socket.addEventListener('message', (event) => {
-			console.log('Received: ', event.data);
-			let data = JSON.parse(event.data);
-			console.log(data);
-			if(data["MakeMove"]) {
-				let move = data["MakeMove"]
-				// console.log(data["MakeMove"]);
-				boards[move["global_grid_x"]][move["global_grid_y"]].remote_place(move["local_grid_x"], move["local_grid_y"])
-			} else if (data["JoinSuccess"]) {
-				toastStore.trigger({message: `Joined session ${data["JoinSuccess"]}`});
-			} else if (data["GameStart"]) {
-				if (data["GameStart"]["starting_player"] == "O") {
-					current_player = Player.O;
-				} else {
-					current_player = Player.X;
-				}
-				if (data["GameStart"]["player"] == "O") {
-					this_player = Player.O;
-				} else {
-					this_player = Player.X;
-				}
-				toastStore.trigger({message: "Game starting now!"})
+	socket.addEventListener('message', (event) => {
+		console.log('Received: ', event.data);
+		let data = JSON.parse(event.data);
+		console.log(data);
+		if (data['MakeMove']) {
+			let move = data['MakeMove'];
+			// console.log(data["MakeMove"]);
+			boards[move['global_grid_x']][move['global_grid_y']].remote_place(
+				move['local_grid_x'],
+				move['local_grid_y']
+			);
+		} else if (data['JoinSuccess']) {
+			toastStore.trigger({ message: `Joined session ${data['JoinSuccess']}` });
+		} else if (data['GameStart']) {
+			if (data['GameStart']['starting_player'] == 'O') {
+				current_player = Player.O;
+			} else {
+				current_player = Player.X;
 			}
-		});
-
-		socket.addEventListener('error', (event) => {
-			console.log(event);
-		});
-	}
+			if (data['GameStart']['player'] == 'O') {
+				this_player = Player.O;
+			} else {
+				this_player = Player.X;
+			}
+			toastStore.trigger({ message: 'Game starting now!' });
+		}
+	});
 
 	export function new_game() {
 		socket.send('{"NewSession":null}');
@@ -88,7 +76,7 @@
 	}
 
 	export function start_game() {
-		socket.send('"RequestGameStart"')
+		socket.send('"RequestGameStart"');
 	}
 
 	let test_text = 'TEST';
@@ -100,7 +88,15 @@
 			<div class="flex flex-col flex-1">
 				{#each [0, 1, 2] as j}
 					<div class="card m-1 aspect-square border-solid border border-red-600 rounded-none flex">
-						<TicTacToe standalone={false} bind:current_player bind:this_player bind:this={boards[i][j]} {socket} global_x={i} global_y={j} />
+						<TicTacToe
+							standalone={false}
+							bind:current_player
+							bind:this_player
+							bind:this={boards[i][j]}
+							{socket}
+							global_x={i}
+							global_y={j}
+						/>
 					</div>
 				{/each}
 			</div>

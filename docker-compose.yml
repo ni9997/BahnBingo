@@ -1,0 +1,12 @@
+services:
+  frontend:
+    image: bahnbingo/frontend
+    build: ./website
+    # ports:
+    #   -"8080:80"
+  
+  backend:
+    image: bahnbingo/backend
+    build: ./backend
+    # ports:
+    #   -"8080:8080"
